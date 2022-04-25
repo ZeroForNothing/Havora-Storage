@@ -1,0 +1,14 @@
+{
+    "compilerOptions": {
+        "lib": ["ESNext"],
+        "target": "esnext",
+        "removeComments": true,
+        "esModuleInterop": true,
+        "noImplicitAny": true,
+        "module": "commonjs",
+        "preserveConstEnums": true,    
+        "moduleResolution": "node",
+        "sourceMap": true,
+        "outDir": "dist"
+      }
+}
