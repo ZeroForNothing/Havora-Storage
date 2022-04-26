@@ -219,58 +219,30 @@ const serverManager = require('http').Server(app)
       })
     })
   })
-
-
-  function createPicTokenFile(picToken : string) {
-    serverLog("Creating user files with token " + picToken);
+  app.post('/createPicTokenDirectory', async (req : any, res : any) => {
+    let picToken = req.body.picToken;
+    if(!picToken) return res.json({ ok: false })
+    
     let profDir = './MediaFiles/ProfilePic/' + picToken;
     let wallDir = './MediaFiles/WallpaperPic/' + picToken;
     let postMediaDir = './MediaFiles/PostFiles/' + picToken;
-
+    
     let tempProfDir = './MediaTempFiles/ProfilePic/' + picToken;
     let tempWallDir = './MediaTempFiles/WallpaperPic/' + picToken;
     let tempPostMediaDir = './MediaTempFiles/PostFiles/' + picToken;
+    
+    serverLog("Checking user directory with token " + picToken);
 
-    fs.access(profDir, function (error : any) {
-      if (error) {
-        fs.mkdirAsync(profDir);
-      } else {
-        console.log("Directory already exists.")
-      }
-    })
-    fs.access(wallDir, function (error : any) {
-      if (error) {
-        fs.mkdirAsync(wallDir);
-      } else {
-        console.log("Directory already exists.")
-      }
-    })
-    fs.access(postMediaDir, function (error : any) {
-      if (error) {
-        fs.mkdirAsync(postMediaDir);
-      } else {
-        console.log("Directory already exists.")
-      }
-    })
-    fs.access(tempProfDir, function (error : any) {
-      if (error) {
-        fs.mkdirAsync(tempProfDir);
-      } else {
-        console.log("Directory already exists.")
-      }
-    })
-    fs.access(tempWallDir, function (error : any) {
-      if (error) {
-        fs.mkdirAsync(tempWallDir);
-      } else {
-        console.log("Directory already exists.")
-      }
-    })
-    fs.access(tempPostMediaDir, function (error : any) {
-      if (error) {
-        fs.mkdirAsync(tempPostMediaDir);
-      } else {
-        console.log("Directory already exists.")
-      }
-    })
-  }
+    const profDirResult = await checkCreateUploadsFolder(profDir)
+    const wallDirResult = await checkCreateUploadsFolder(wallDir)
+    const postMediaDirResult = await checkCreateUploadsFolder(postMediaDir)
+
+    const tempProfDirResult = await checkCreateUploadsFolder(tempProfDir)
+    const tempWallDirResult = await checkCreateUploadsFolder(tempWallDir)
+    const tempPostMediaDirResult = await checkCreateUploadsFolder(tempPostMediaDir)
+    
+    if(profDirResult && wallDirResult && postMediaDirResult && tempProfDirResult && tempWallDirResult && tempPostMediaDirResult)
+      return res.json({ ok: true })
+    else
+      return res.json({ ok: false })
+  })
