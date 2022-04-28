@@ -2,10 +2,12 @@
 MediaFiles/PostFiles/
 MediaFiles/ProfilePic/
 MediaFiles/WallpaperPic/
+MediaFiles/ChatFiles/
 
 MediaTempFiles/PostFiles/
 MediaTempFiles/ProfilePic/
 MediaTempFiles/WallpaperPic/
+MediaTempFiles/ChatFiles/
 
 # Logs
 logs

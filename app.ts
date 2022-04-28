@@ -63,24 +63,25 @@ const serverManager = require('http').Server(app)
   }
   app.post('/CreateTempDirectory', async (req : any, res : any) => {
       serverLog("Creating Temp Directory...")
-      if(!req.body.picToken || !req.body.folderName) {
-        serverLog("picToken or folderName in body had no value")
+      if(!req.body.picToken || !req.body.folderName || !req.body.directoryType) {
+        serverLog("picToken or folderName or directoryType in body had no value")
         return;
       }
-      const uploadsTempFolder = `./MediaTempFiles/PostFiles/${req.body.picToken}/${req.body.folderName}`
+      const uploadsTempFolder = `./MediaTempFiles/${req.body.directoryType}/${req.body.picToken}/${req.body.folderName}`
       const folderCreationTempResult = await checkCreateUploadsFolder(uploadsTempFolder)
       if(folderCreationTempResult){
+        serverLog(`Temp directory in ${req.body.directoryType} created`)
         return res.json({ ok: true })       
       }
       return res.json({ ok: false })
   })
   app.post('/CheckTempDirectory', async (req : any, res : any) => {
     serverLog("Checking temp files exists...")
-    if(!req.body.picToken || !req.body.folderName) {
-      serverLog("picToken or folderName in body had no value")
+    if(!req.body.picToken || !req.body.folderName || !req.body.directoryType) {
+      serverLog("picToken or folderName or directoryType in body had no value")
       return;
     }
-    const uploadsTempFolder = `./MediaTempFiles/PostFiles/${req.body.picToken}/${req.body.folderName}`
+    const uploadsTempFolder = `./MediaTempFiles/${req.body.directoryType}/${req.body.picToken}/${req.body.folderName}`
     const checkExist = await checkCreateUploadsFolder(uploadsTempFolder)
     if(!checkExist) return res.json({ ok: false })
 
@@ -88,27 +89,28 @@ const serverManager = require('http').Server(app)
       if(err){
         return res.json({ ok: false })
       }
-      let tempPostFiles : string[] = [];
+      let tempFiles : string[] = [];
       files.forEach((file : string) => {
-        tempPostFiles.push(file);
+        tempFiles.push(file);
       });
-      return res.json({ ok: true  , tempPostFiles})
+      serverLog(`Fetched all files in ${req.body.directoryType}`)
+      return res.json({ ok: true  , tempFiles})
     });
     return res.json({ ok: false })
   })
   app.post('/CreateDirectory', async (req : any, res : any) => {
-    if(!req.body.picToken && !req.body.folderName && !req.body.tempPostFiles){
-      serverLog("PicToken or file name or post files in body had no value")
+    if(!req.body.picToken && !req.body.folderName && !req.body.tempFiles || !req.body.directoryType){
+      serverLog("PicToken or file name or post files or directory type in body had no value")
       return;
     }
-    if (req.body.tempPostFiles){
-      if(req.body.tempPostFiles.length == 0) return res.json({ ok: true })
+    if (req.body.tempFiles){
+      if(req.body.tempFiles.length == 0) return res.json({ ok: true })
         serverLog("Creating directory...")
-        let tempDirectory = `./MediaTempFiles/PostFiles/${req.body.picToken}/${req.body.folderName}`
-        let directory = `./MediaFiles/PostFiles/${req.body.picToken}/${req.body.folderName}`
+        let tempDirectory = `./MediaTempFiles/${req.body.directoryType}/${req.body.picToken}/${req.body.folderName}`
+        let directory = `./MediaFiles/${req.body.directoryType}/${req.body.picToken}/${req.body.folderName}`
         fs.mkdirAsync(directory);
         serverLog("Moving files...")
-        req.body.tempPostFiles.forEach(function (value : string) {
+        req.body.tempFiles.forEach(function (value : string) {
           fs.renameAsync(tempDirectory + '/' + value, directory + '/' + value, function (err : any) {
             if (err){
                serverLog('ERROR: ' + err);
@@ -117,6 +119,7 @@ const serverManager = require('http').Server(app)
             serverLog(`File moved: ${value}`)
           });
         })
+        serverLog(`All files moved async from temp in ${req.body.directoryType}`)
         return res.json({ ok: true })
       }
       return res.json({ ok: false })
@@ -143,32 +146,48 @@ const serverManager = require('http').Server(app)
     let form = new formidable.IncomingForm()
     const picToken = req.query.picToken;
     const folderName = req.query.folderName;
-    if (!picToken || !folderName) res.json({ ok: false, error: `Pictoken: ${picToken} or folderName: ${folderName} not found` })
-    const uploadsTempFolder = `./MediaFiles/PostFiles/${picToken}/${folderName}`
+    const directoryFolder = req.query.directoryFolder;
+    if (!picToken || !folderName) res.json({ ok: false, error: `Pictoken: ${picToken} or folderName: ${folderName} not found or directoryFolder: ${directoryFolder} not found` })
+    const uploadsTempFolder = `./MediaTempFiles/${directoryFolder}/${picToken}/${folderName}/`
     
-    form.multiples = false
+    form.multiples = false;
     form.uploadDir = uploadsTempFolder
     form.maxFileSize = 100 * 1024 * 1024 // 100 MB
+    // form.keepExtensions = true;
 
-    form.parse(req, async (err : any, fields : any, files : any) => {
-      if (err) {
-        serverLog('Error parsing the incoming form')
-        return res.json({ ok: false, error: 'Error passing the incoming form' })
-      }
-      if (!files.files) {
+    form.on('fileBegin', (formname : any, file : any) => {
+      if (!file) {
         serverLog('No file selected')
         return res.json({ ok: false, error: 'No file selected' })
       }
-      // If we are sending only one file:
-      const file = files.files;
       const type = checkExtension(file , false);
       if (!type) return res.json({ ok: false, error: 'Invalid file type' })
       const fileName = file.newFilename + "." + type
-      await fs.renameAsync(file.filepath, path.join(uploadsTempFolder, fileName))
-      serverLog(`Uploaded file: ${fileName} to PostFiles`)
-      return res.json({ ok: true, msg: true })
-    })
+      file.filepath = form.uploadDir  +  "/" + fileName;
+      //fs.renameAsync(file.filepath, form.uploadDir + "/" + fileName);
+    });
+    form.on('file', function(field : any, file : any) {
+
+    });
+    form.on('error', function(err : any) {
+      serverLog("An error has occured with form upload");
+        console.log(err);
+        //req.resume();
+        return res.json({ ok: false, error: err })
+    });
+    form.on('aborted', function(err : any) {
+      serverLog("user aborted upload");
+      return res.json({ ok: false, error: "Aborted file upload" })
+    });
+    form.on('end', function() {
+        serverLog(`Uploaded file to temp ${directoryFolder}`)
+        return res.json({ ok: true })
+    });
+    form.parse(req, function() {
+  
+    });
   })
+
   app.post('/profileUpload', async (req : any, res : any) => {
     let form = new formidable.IncomingForm()
     let picToken = req.query.picToken;
@@ -226,22 +245,26 @@ const serverManager = require('http').Server(app)
     let profDir = './MediaFiles/ProfilePic/' + picToken;
     let wallDir = './MediaFiles/WallpaperPic/' + picToken;
     let postMediaDir = './MediaFiles/PostFiles/' + picToken;
+    let chatMediaDir = './MediaFiles/ChatFiles/' + picToken;
     
     let tempProfDir = './MediaTempFiles/ProfilePic/' + picToken;
     let tempWallDir = './MediaTempFiles/WallpaperPic/' + picToken;
     let tempPostMediaDir = './MediaTempFiles/PostFiles/' + picToken;
+    let tempChatMediaDir = './MediaTempFiles/ChatFiles/' + picToken;
     
-    serverLog("Checking user directory with token " + picToken);
+    serverLog("Checking directory folders with token " + picToken);
 
     const profDirResult = await checkCreateUploadsFolder(profDir)
     const wallDirResult = await checkCreateUploadsFolder(wallDir)
     const postMediaDirResult = await checkCreateUploadsFolder(postMediaDir)
+    const chatMediaDirResult = await checkCreateUploadsFolder(chatMediaDir)
 
     const tempProfDirResult = await checkCreateUploadsFolder(tempProfDir)
     const tempWallDirResult = await checkCreateUploadsFolder(tempWallDir)
     const tempPostMediaDirResult = await checkCreateUploadsFolder(tempPostMediaDir)
+    const tempChatMediaDirResult = await checkCreateUploadsFolder(tempChatMediaDir)
     
-    if(profDirResult && wallDirResult && postMediaDirResult && tempProfDirResult && tempWallDirResult && tempPostMediaDirResult)
+    if(profDirResult && wallDirResult && postMediaDirResult && tempProfDirResult && tempWallDirResult && tempPostMediaDirResult && chatMediaDirResult && tempChatMediaDirResult)
       return res.json({ ok: true })
     else
       return res.json({ ok: false })
