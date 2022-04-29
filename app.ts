@@ -63,15 +63,16 @@ const serverManager = require('http').Server(app)
   }
   app.post('/CreateTempDirectory', async (req : any, res : any) => {
       serverLog("Creating Temp Directory...")
-      if(!req.body.picToken || !req.body.folderName || !req.body.directoryType) {
-        serverLog("picToken or folderName or directoryType in body had no value")
+      if(!req.body.picToken || !req.body.directoryType) {
+        serverLog("picToken or directoryType in body had no value")
         return;
       }
-      const uploadsTempFolder = `./MediaTempFiles/${req.body.directoryType}/${req.body.picToken}/${req.body.folderName}`
+      const folderName = ("MediaFolder_" + (new Date()).toUTCString()).replace(/\s/g, '').replace(/\:/g, "").replace(',', '')
+      const uploadsTempFolder = `./MediaTempFiles/${req.body.directoryType}/${req.body.picToken}/${folderName}`
       const folderCreationTempResult = await checkCreateUploadsFolder(uploadsTempFolder)
       if(folderCreationTempResult){
         serverLog(`Temp directory in ${req.body.directoryType} created`)
-        return res.json({ ok: true })       
+        return res.json({ ok: true , folderName })       
       }
       return res.json({ ok: false })
   })
@@ -154,7 +155,7 @@ const serverManager = require('http').Server(app)
     form.uploadDir = uploadsTempFolder
     form.maxFileSize = 100 * 1024 * 1024 // 100 MB
     // form.keepExtensions = true;
-
+    form.once('error', console.error);
     form.on('fileBegin', (formname : any, file : any) => {
       if (!file) {
         serverLog('No file selected')
@@ -171,7 +172,7 @@ const serverManager = require('http').Server(app)
     });
     form.on('error', function(err : any) {
       serverLog("An error has occured with form upload");
-        console.log(err);
+        console.error(err);
         //req.resume();
         return res.json({ ok: false, error: err })
     });
@@ -180,8 +181,10 @@ const serverManager = require('http').Server(app)
       return res.json({ ok: false, error: "Aborted file upload" })
     });
     form.on('end', function() {
+      if(!res.writableEnded){
         serverLog(`Uploaded file to temp ${directoryFolder}`)
         return res.json({ ok: true })
+      }
     });
     form.parse(req, function() {
   
