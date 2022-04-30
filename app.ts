@@ -111,19 +111,20 @@ const serverManager = require('http').Server(app)
         let directory = `./MediaFiles/${req.body.directoryType}/${req.body.picToken}/${req.body.folderName}`
         fs.mkdirAsync(directory);
         serverLog("Moving files...")
-        req.body.tempFiles.forEach(function (value : string) {
+        req.body.tempFiles.forEach((value : string , index : number) => {
           fs.renameAsync(tempDirectory + '/' + value, directory + '/' + value, function (err : any) {
             if (err){
                serverLog('ERROR: ' + err);
               return res.json({ ok: false })
             }
             serverLog(`File moved: ${value}`)
+            if(index == req.body.tempFiles.length - 1){
+              serverLog(`All files moved async from temp in ${req.body.directoryType}`)
+              return res.json({ ok: true })
+            }
           });
         })
-        serverLog(`All files moved async from temp in ${req.body.directoryType}`)
-        return res.json({ ok: true })
       }
-      return res.json({ ok: false })
   })
   app.post('/MovePicDirectory', async (req : any, res : any) => {
     if(!req.body.picToken && !req.body.picType && !req.body.fileName){
